@@ -25,6 +25,9 @@ type Change() =
     member this.Filename
         with get() : string  =
             ""
+    member this.ID
+        with get() : decimal = 
+            0m
 
     interface IComparable with
         member this.CompareTo (o : obj) =
