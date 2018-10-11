@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net46;net45</TargetFrameworks>
+    <Language>F#</Language>
+    <TargetFSharpCoreVersion>4.4.0.0</TargetFSharpCoreVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>MyBatis.Migrations</AssemblyName>
+    <Description>MyBatis Migrations</Description>
+  </PropertyGroup>
+
+  <Import Project="../MyBatis.Shared.props" />
+  <Import Project="../../submodules/vdimensions_msbuild_sdk/src/MultitargetingFrameworkSupport.targets" />
+  <Import Project="../../submodules/vdimensions_msbuild_sdk/src/AssemblyLevelProperties.targets" />
+  
+  <ItemGroup>
+    <None Include="paket.dependencies" />
+    <None Include="paket.lock" />
+    <None Include="paket.references" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Operations.fs" />
+    <Compile Include="Class1.fs" />
+  </ItemGroup>
+
+  <Import Project=".paket\Paket.Restore.targets" />
+</Project>

@@ -1,0 +1,6 @@
+framework: auto-detect
+storage: none
+
+source https://nuget.org/api/v2
+  nuget FSharp.Core >= 4.5
+

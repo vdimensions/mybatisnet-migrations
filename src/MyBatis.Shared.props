@@ -1,0 +1,35 @@
+<Project>
+  <PropertyGroup>
+    <Authors>http://ibatis.apache.org/</Authors>
+    <Copyright>Copyright © 2009-$([System.DateTime]::get_Now().get_Year()) $(Authors).</Copyright>
+  </PropertyGroup>
+  <!-- Versioning properties -->
+  <PropertyGroup>
+    <Deterministic>false</Deterministic>
+    <Major>1</Major>
+    <Minor>6</Minor>
+    <Build>$([System.DateTime]::op_Subtraction($([System.DateTime]::get_Now().get_Date()),$([System.DateTime]::new(2000,1,1))).get_TotalDays())</Build>
+    <Revision>$([MSBuild]::Divide($([System.DateTime]::get_Now().get_TimeOfDay().get_TotalSeconds()), 2).ToString('F0'))</Revision>
+    <Version>$(Major).$(Minor).$(Build).$(Revision)</Version>
+  </PropertyGroup>
+  <!-- Assembly info properties -->
+  <PropertyGroup>
+    <AssemblyTitle>$(AssemblyName)</AssemblyTitle>
+    <AssemblyProduct>MyBatis.NET</AssemblyProduct>
+    <AssemblyCompany>$(Authors)</AssemblyCompany>
+    <AssemblyCopyright>$(Copyright)</AssemblyCopyright>
+    <AssemblyTrademark>Licensed under the Apache License, Version 2.0</AssemblyTrademark>
+    <AssemblyDecription>$(Description)</AssemblyDecription>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <AssemblyFileVersion>$(Version)</AssemblyFileVersion>
+    <AssemblyInformationalVersion>$(Version)</AssemblyInformationalVersion>
+  </PropertyGroup>
+  <!-- Nuget package properties -->
+  <PropertyGroup>
+    <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
+    <PackageProjectUrl></PackageProjectUrl>
+    <PackageIconUri></PackageIconUri>
+    <PackageTags>MyBatis.NET mybatisnet</PackageTags>
+    <PackageVersion>$(Version)</PackageVersion>
+  </PropertyGroup>
+</Project>
