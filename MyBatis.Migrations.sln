@@ -2,11 +2,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2026
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MyBatis.Migrator", "src/MyBatis.Migrator/MyBatis.Migrator.fsproj", "{0648B073-20B2-455C-9104-3695C997C764}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MyBatis.Migrator", "src\MyBatis.Migrator\MyBatis.Migrator.fsproj", "{0648B073-20B2-455C-9104-3695C997C764}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Migrations", "src/Migrations", "{779F8050-77D6-401C-BC58-3C891144F6B7}"
-EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "MyBatis.Migrations", "src/MyBatis.Migrations/MyBatis.Migrations.fsproj", "{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "MyBatis.Migrations", "src\MyBatis.Migrations\MyBatis.Migrations.fsproj", "{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,11 +14,25 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0648B073-20B2-455C-9104-3695C997C764}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Debug|x86.Build.0 = Debug|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Release|x86.ActiveCfg = Release|Any CPU
+		{0648B073-20B2-455C-9104-3695C997C764}.Release|x86.Build.0 = Release|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Debug|x86.Build.0 = Debug|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Release|x86.ActiveCfg = Release|Any CPU
+		{D05A9B63-C055-4A48-AFCA-41484D6CA6BA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7AB18ACB-A50E-4B66-9F85-0F933D7C4E02}
