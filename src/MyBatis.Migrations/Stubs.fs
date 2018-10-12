@@ -64,7 +64,7 @@ module Database =
     let changelogExists (cp : ConnectionProvider) (opt : DatabaseOperationOption) : bool =
         false
 
-    let getChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) : List<_> =
+    let getChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) : _ list =
         List.empty
 
     let insertChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) (change : Change) =
@@ -84,8 +84,13 @@ module Database =
     let getScriptRunner (cp : ConnectionProvider) (opt : DatabaseOperationOption) (out : TextWriter) =
         Unchecked.defaultof<ScriptRunner>
 
-    let checkSkippedOrMissing (changesInDb : List<_>) (migrations : Change list) (out : TextWriter) : unit =
+    let checkSkippedOrMissing (changesInDb : Change list) (migrations : Change list) (out : TextWriter) : unit =
         ignore()
+
+    let removeLast (changesInDb : Change list) : Change list =
+        let changeToRemove = List.last changesInDb
+        // TODO: remove actually
+        changesInDb |> List.except [changeToRemove]
 
 module Util =
     let horizontalLine (str : string) (n : int) : string =

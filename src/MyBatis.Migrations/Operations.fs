@@ -33,54 +33,60 @@ module Operations =
                 //if isDown then Collections.reverse(migrations)
                 //
                 Database.checkSkippedOrMissing changesInDb migrations out
-                let mutable stepCount = 0
                 let mutable hookBindings = Map.empty<String, HookContext>
-                use runner = Database.getScriptRunner cp opt out
                 let mutable changes = migrations
+                use runner = Database.getScriptRunner cp opt out
 
-                try 
-                    for _ in [0 .. steps-1] do
-                        let change = changes.Head
-                        changes <- changes.Tail
-                        if (List.isEmpty changesInDb || (change < (List.last changesInDb))) then
+                let rec traverseChanges (ml : MigrationsLoader) (cp : ConnectionProvider) (acc : int) (persistedChanges : Change list) (changes : Change list) =
+                    match changes with
+                    | [] -> acc
+                    | head::tail ->
+                        if (List.isEmpty changesInDb || (head < (List.last persistedChanges))) then
+                            let mutable br = false
                             match hook with
-                            | Some hook ->
-                                if stepCount = 0 then
-                                    hookBindings <- hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, None))
-                                    hook.Before hookBindings
-                                hookBindings <- hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, change.Clone() |> Some))
-                                hook.BeforeEach hookBindings
-                            | None -> 
-                                ignore()
-                            
-                            use scriptReader = ml.GetScriptReader change isDown
+                            | Some h ->
+                                hookBindings <- hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, head.Clone() |> Some))
+                                h.BeforeEach hookBindings
+                            | None -> ignore()
+
+                            use scriptReader = ml.GetScriptReader head isDown
                             if (isDown) then
-                                out.WriteLine((Util.horizontalLine ("Undoing: " + change.Filename) 80))
+                                out.WriteLine((Util.horizontalLine ("Undoing: " + head.Filename) 80))
                                 runner.RunScript scriptReader
                                 //Database.insertChangelog cp opt change
                                 if (Database.changelogExists cp opt) then
-                                    Database.deleteChange cp opt change
+                                    Database.deleteChange cp opt head
                                 else
                                     out.WriteLine("Changelog doesn't exist. No further migrations will be undone (normal for the last migration).")
-                                    stepCount <- steps;
+                                    br <- true
                             else
-                                out.WriteLine((Util.horizontalLine ("Applying: " + change.Filename) 80))
+                                out.WriteLine((Util.horizontalLine ("Applying: " + head.Filename) 80))
                                 runner.RunScript scriptReader
-                                Database.insertChangelog cp opt change
+                                Database.insertChangelog cp opt head
                             out.WriteLine()
 
                             match hook with
-                            | Some hook ->
-                                hookBindings <-  hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, change.Clone() |> Some))
-                                hook.AfterEach hookBindings
-                            stepCount <- stepCount + 1
+                            | Some h ->
+                                hookBindings <-  hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, head.Clone() |> Some))
+                                h.AfterEach hookBindings
+                            | None -> ignore()
 
+                            if not br && steps > 0 && acc < steps then
+                                if isDown then
+                                    traverseChanges ml cp (acc + 1) (persistedChanges |> List.except [head]) tail
+                                else
+                                    traverseChanges ml cp (acc + 1) persistedChanges tail
+                            else acc + 1
+                        else acc
+                try 
                     match hook with
-                    | Some hook when stepCount > 0 ->
-                        hookBindings <-  hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, None))
-                        hook.After hookBindings
-                    | _ -> ignore()
-
+                    | Some h ->
+                        hookBindings <- hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, None))
+                        h.Before hookBindings
+                        if traverseChanges ml cp 0 changesInDb changes > 0 then
+                            hookBindings <-  hookBindings |> Map.add MigrationHook.HOOK_CONTEXT (HookContext(cp, runner, None))
+                            h.After hookBindings
+                    | _ -> traverseChanges ml cp 0 changesInDb changes |> ignore
                 // TODO: requires MyBatis.Common
                 //with :? RuntimeSqlException as e
                 //    use onAbortScriptReader = ml.GetOnAbortReader()
@@ -115,10 +121,10 @@ module Operations =
                     out.WriteLine("Error, could not run bootstrap.sql. The file does not exist.")
 
         | Up steps ->
-            Operations.upDown out opt cp ml hook steps false
+            upDown out opt cp ml hook steps false
 
         | Down steps ->
-            Operations.upDown out opt cp ml hook steps true
+            upDown out opt cp ml hook steps true
             //List<Change> changesInDb = Collections.emptyList();
             //if (changelogExists(connectionProvider, option)) {
             //  changesInDb = getChangelog(connectionProvider, option);
