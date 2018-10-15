@@ -12,9 +12,34 @@ type Operation =
     | Status
     | Pending
 
+type OperationResult =
+    | BootstrapComplete
+    | BoostrapSkipped
+    | MigrationResult
+    | Error
+    | VersionResult
+    | StatusResult of pending : int * applied : int * changes : Change list
+    | PendingResult
+
 module Operations =
 
-    let upDown (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (steps : int) (isDown : bool) : unit =
+    let private boostrap(out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (forced : bool) : OperationResult =
+        if (Database.changelogExists cp opt && not forced) then
+            out.WriteLine("For your safety, the bootstrap SQL script will only run before migrations are applied (i.e. before the changelog exists).  If you're certain, you can run it using the --force option.")
+            BoostrapSkipped
+        else
+            match ml.GetBootstrapReader() with
+            | Some bootstrapReader ->
+                out.WriteLine((Util.horizontalLine "Applying: bootstrap.sql" 80))
+                use runner = Database.getScriptRunner cp opt out
+                runner.RunScript(bootstrapReader)
+                out.WriteLine()
+                BootstrapComplete
+            | None ->
+                out.WriteLine("Error, could not run bootstrap.sql. The file does not exist.")
+                Error
+
+    let private upDown (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (steps : int) (isDown : bool) : OperationResult =
         try
             let changesInDb =
                 if (Database.changelogExists cp opt) 
@@ -53,12 +78,13 @@ module Operations =
                             if (isDown) then
                                 out.WriteLine((Util.horizontalLine ("Undoing: " + head.Filename) 80))
                                 runner.RunScript scriptReader
-                                //Database.insertChangelog cp opt change
-                                if (Database.changelogExists cp opt) then
-                                    Database.deleteChange cp opt head
-                                else
-                                    out.WriteLine("Changelog doesn't exist. No further migrations will be undone (normal for the last migration).")
-                                    br <- true
+                                br <- 
+                                    if (Database.changelogExists cp opt) then
+                                        Database.deleteChange cp opt head
+                                        false
+                                    else
+                                        out.WriteLine("Changelog doesn't exist. No further migrations will be undone (normal for the last migration).")
+                                        true
                             else
                                 out.WriteLine((Util.horizontalLine ("Applying: " + head.Filename) 80))
                                 runner.RunScript scriptReader
@@ -104,92 +130,43 @@ module Operations =
                     | _ -> e
                 let e1 = resolveEx (e)
                 raise <| MigrationException("Error executing command. Cause: " + e1.Message, e1)
+        MigrationResult
 
-    let operate (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (op : Operation) : unit =
-        match op with
-        | Bootstrap forced ->
-            if (Database.changelogExists cp opt && not forced) then
-                out.WriteLine("For your safety, the bootstrap SQL script will only run before migrations are applied (i.e. before the changelog exists).  If you're certain, you can run it using the --force option.")
-            else
-                match ml.GetBootstrapReader() with
-                | Some bootstrapReader ->
-                    out.WriteLine((Util.horizontalLine "Applying: bootstrap.sql" 80))
-                    use runner = Database.getScriptRunner cp opt out
-                    runner.RunScript(bootstrapReader)
-                    out.WriteLine()
+    let private version (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (id : decimal) =
+        VersionResult
+
+    let private status (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) : OperationResult =
+        out.WriteLine("ID             Applied At          Description")
+        out.WriteLine((Util.horizontalLine ""  80))
+        let migrations = ml.GetMigrations()
+        let mutable (pending, applied, changes) = (0, 0, System.Collections.Generic.List<Change>()) 
+        if (Database.changelogExists cp opt) then
+            let changelog = Database.getChangelog cp opt
+            for change in migrations do
+                match changelog |> List.tryFind (fun e -> e.Equals(change))  with
+                | Some c ->
+                    changes.Add(c)
+                    applied <- applied + 1
                 | None ->
-                    out.WriteLine("Error, could not run bootstrap.sql. The file does not exist.")
+                    changes.Add(change)
+                    pending <- pending + 1
+        else
+            changes.AddRange(migrations)
+            pending <- List.length migrations
+        //Collections.sort(changes);
+        for change in changes do
+            out.WriteLine(change.ToString())
+        out.WriteLine()
+        StatusResult (pending, applied, changes |> List.ofSeq)
 
-        | Up steps ->
-            upDown out opt cp ml hook steps false
+    let private pending (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) =
+        PendingResult
 
-        | Down steps ->
-            upDown out opt cp ml hook steps true
-            //List<Change> changesInDb = Collections.emptyList();
-            //if (changelogExists(connectionProvider, option)) {
-            //  changesInDb = getChangelog(connectionProvider, option);
-            //}
-            //if (changesInDb.isEmpty()) {
-            //  println(printStream, "Changelog exist, but no migration found.");
-            //} else {
-            //  List<Change> migrations = migrationsLoader.getMigrations();
-            //  Collections.sort(migrations);
-            //  checkSkippedOrMissing(changesInDb, migrations, printStream);
-            //  Collections.reverse(migrations);
-            //  int stepCount = 0;
-            //  ScriptRunner runner = getScriptRunner(connectionProvider, option, printStream);
-            //
-            //  Map<String, Object> hookBindings = new HashMap<String, Object>();
-            //---------------------------
-            //
-            //  try {
-            //    for (Change change : migrations) {
-            //      if (change.equals(changesInDb.get(changesInDb.size() - 1))) {
-            //        if (stepCount == 0 && hook != null) {
-            //          hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, null));
-            //          hook.before(hookBindings);
-            //        }
-            //        if (hook != null) {
-            //          hookBindings.put(MigrationHook.HOOK_CONTEXT,
-            //              new HookContext(connectionProvider, runner, change.clone()));
-            //          hook.beforeEach(hookBindings);
-            //        }
-            //        println(printStream, Util.horizontalLine("Undoing: " + change.getFilename(), 80));
-            //        runner.runScript(migrationsLoader.getScriptReader(change, true));
-            //        if (changelogExists(connectionProvider, option)) {
-            //          deleteChange(connectionProvider, change, option);
-            //        } else {
-            //          println(printStream,
-            //              "Changelog doesn't exist. No further migrations will be undone (normal for the last migration).");
-            //          stepCount = steps;
-            //        }
-            //        println(printStream);
-            //        if (hook != null) {
-            //          hookBindings.put(MigrationHook.HOOK_CONTEXT,
-            //              new HookContext(connectionProvider, runner, change.clone()));
-            //          hook.afterEach(hookBindings);
-            //        }
-            //        stepCount++;
-            //        if (steps == null || stepCount >= steps) {
-            //          break;
-            //        }
-            //        changesInDb.remove(changesInDb.size() - 1);
-            //      }
-            //    }
-            //    if (stepCount > 0 && hook != null) {
-            //      hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, null));
-            //      hook.after(hookBindings);
-            //    }
-            //  } finally {
-            //    runner.closeConnection();
-            //  }
-            //}
-
-        | Version id ->
-            ignore()
-
-        | Status ->
-            ignore()
-
-        | Pending ->
-            ignore()
+    let exec (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (op : Operation) : OperationResult =
+        match op with
+        | Bootstrap forced -> boostrap out opt cp ml hook forced
+        | Up steps -> upDown out opt cp ml hook steps false
+        | Down steps -> upDown out opt cp ml hook steps true
+        | Version id -> version out opt cp ml hook id
+        | Status -> status out opt cp ml hook
+        | Pending -> pending out opt cp ml hook

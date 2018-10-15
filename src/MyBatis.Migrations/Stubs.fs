@@ -64,7 +64,7 @@ module Database =
     let changelogExists (cp : ConnectionProvider) (opt : DatabaseOperationOption) : bool =
         false
 
-    let getChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) : _ list =
+    let getChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) : Change list =
         List.empty
 
     let insertChangelog (cp : ConnectionProvider) (opt : DatabaseOperationOption) (change : Change) =
