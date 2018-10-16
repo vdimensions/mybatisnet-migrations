@@ -23,6 +23,11 @@ type OperationResult =
 
 module Operations =
 
+    let rec private resolveEx (e : exn) : exn =
+        match e with
+        | :? MigrationException as me -> resolveEx me.InnerException
+        | _ -> e
+
     let private boostrap(out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (forced : bool) : OperationResult =
         if (Database.changelogExists cp opt && not forced) then
             out.WriteLine("For your safety, the bootstrap SQL script will only run before migrations are applied (i.e. before the changelog exists).  If you're certain, you can run it using the --force option.")
@@ -124,10 +129,6 @@ module Operations =
                 finally 
                     ignore()
             with e ->
-                let rec resolveEx (e : exn) : exn =
-                    match e with
-                    | :? MigrationException as me -> resolveEx me.InnerException
-                    | _ -> e
                 let e1 = resolveEx (e)
                 raise <| MigrationException("Error executing command. Cause: " + e1.Message, e1)
         MigrationResult
@@ -160,6 +161,40 @@ module Operations =
         StatusResult (pending, applied, changes |> List.ofSeq)
 
     let private pending (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) =
+        try
+            if not (Database.changelogExists(cp opt)) then
+                raise <| MigrationException("Change log doesn't exist, no migrations applied.  Try running 'up' instead.")
+            let pending = getPendingChanges(connectionProvider, migrationsLoader, option)
+            let stepCount = 0
+            let hookBindings = System.Collections.Generic.Dictionary<String, Object>()
+            out.WriteLine("WARNING: Running pending migrations out of order can create unexpected results.")
+            use runner = Database.getScriptRunner(cp, opt, out)
+            let scriptReader: Reader = null
+            try
+                for change in pending do
+                    if (stepCount == 0 && hook != null) then
+                        hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(connectionProvider, runner, null))
+                        hook.Before hookBindings
+                    if (hook != null) then
+                        hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(connectionProvider, runner, change.clone()))
+                        hook.BeforeEach hookBindings
+                    out.WriteLine (Util.horizontalLine ("Applying: " + change.getFilename()) 80)
+                    use scriptReader = migrationsLoader.getScriptReader(change, false)
+                    runner.runScript(scriptReader)
+                    Database.insertChangelog cp opt change
+                    println(printStream)
+                    if (hook != null) then
+                        hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, change.clone()))
+                        hook.afterEach(hookBindings)
+                    stepCount++
+                if (stepCount > 0 && hook != null) then
+                    hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, null))
+                    hook.after(hookBindings)
+            with e ->
+                raise <| MigrationException("Error executing command.  Cause: " + e, e)
+        with e ->
+            let e1 = resolveEx e
+            raise <| MigrationException("Error executing command.  Cause: " + e1.Message, e1)
         PendingResult
 
     let exec (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) (op : Operation) : OperationResult =
