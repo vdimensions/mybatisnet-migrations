@@ -162,36 +162,38 @@ module Operations =
 
     let private pending (out : TextWriter) (opt : DatabaseOperationOption) (cp : ConnectionProvider) (ml : MigrationsLoader) (hook : MigrationHook option) =
         try
-            if not (Database.changelogExists(cp opt)) then
+            if not (Database.changelogExists cp opt) then
                 raise <| MigrationException("Change log doesn't exist, no migrations applied.  Try running 'up' instead.")
             let pending = getPendingChanges(connectionProvider, migrationsLoader, option)
             let stepCount = 0
             let hookBindings = System.Collections.Generic.Dictionary<String, Object>()
             out.WriteLine("WARNING: Running pending migrations out of order can create unexpected results.")
-            use runner = Database.getScriptRunner(cp, opt, out)
-            let scriptReader: Reader = null
+            use runner = Database.getScriptRunner cp opt out
             try
                 for change in pending do
-                    if (stepCount == 0 && hook != null) then
-                        hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(connectionProvider, runner, null))
-                        hook.Before hookBindings
-                    if (hook != null) then
-                        hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(connectionProvider, runner, change.clone()))
-                        hook.BeforeEach hookBindings
-                    out.WriteLine (Util.horizontalLine ("Applying: " + change.getFilename()) 80)
-                    use scriptReader = migrationsLoader.getScriptReader(change, false)
-                    runner.runScript(scriptReader)
+                    match hook with
+                    | Some h ->
+                        if (stepCount = 0) then
+                            hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(cp, runner, None))
+                            h.Before hookBindings
+                        hookBindings.Add(MigrationHook.HOOK_CONTEXT, HookContext(cp, runner, Some <| change.Clone()))
+                        h.BeforeEach hookBindings
+                    | None -> ignore()
+
+                    out.WriteLine (Util.horizontalLine ("Applying: " + change.Filename) 80)
+                    use scriptReader = ml.GetScriptReader change false
+                    runner.RunScript scriptReader
                     Database.insertChangelog cp opt change
-                    println(printStream)
+                    out.WriteLine()
                     if (hook != null) then
                         hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, change.clone()))
-                        hook.afterEach(hookBindings)
-                    stepCount++
+                        hook.AfterEach hookBindings
+                    stepCount <- stepCount + 1
                 if (stepCount > 0 && hook != null) then
                     hookBindings.put(MigrationHook.HOOK_CONTEXT, new HookContext(connectionProvider, runner, null))
-                    hook.after(hookBindings)
+                    hook.After(hookBindings)
             with e ->
-                raise <| MigrationException("Error executing command.  Cause: " + e, e)
+                raise <| MigrationException("Error executing command.  Cause: " + e.Message, e)
         with e ->
             let e1 = resolveEx e
             raise <| MigrationException("Error executing command.  Cause: " + e1.Message, e1)
